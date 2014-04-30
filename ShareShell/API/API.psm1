@@ -117,7 +117,7 @@ This function handles parsing the XML nodes returned by the api
 		}
 	}
 	
-	$Data | Add-Member -MemberType NoteProperty -Name "_ApiMethods" -Value $MethodProperties -Force
+	$Data | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $MethodProperties -Force
 	$Data 
 }	
 
