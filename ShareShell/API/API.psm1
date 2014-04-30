@@ -1,7 +1,7 @@
 ﻿# REST API reference and samples 
 #	http://msdn.microsoft.com/en-us/library/office/jj860569(v=office.15).aspx
 
-Function Parse-EntryNode {
+Function Get-EntryNode {
 <#
 .SYNOPSIS
 This function handles parsing the XML nodes returned by the api
@@ -12,8 +12,6 @@ This function handles parsing the XML nodes returned by the api
 		[System.Xml.XmlElement] $Node,
 		[String] $BaseUri
 	)			
-	
-	$DebugPreference = "Continue" 
 	
 	$NameSpaces = @{
 		base="https://sharepoint.uni-hamburg.de/anwendungen/sap-berichtswesen/_api/"
@@ -45,7 +43,7 @@ This function handles parsing the XML nodes returned by the api
 			$Properties[$Name] = $Value
 		}					
 	} 
-	Write-Debug ("Parse-EntryNode: parse time {0}ms" -f $XmlParseTime.Milliseconds)
+	Write-Debug ("Get-EntryNode: parse time {0}ms" -f $XmlParseTime.Milliseconds)
 	
 	$Data = New-Object -TypeName PsObject -Property $Properties
 	
@@ -146,13 +144,14 @@ Function Invoke-XmlApiRequest {
 	if ($Xml.PSObject.Properties["feed"] -ne $null) {
 		Write-Debug ("Invoke-XmlApiRequest: Parsing as feed: {0} entries" -f $Xml.feed.entry.Count)
 		$Xml.feed.entry | ForEach-Object  {
-			Parse-EntryNode -Node $_ -BaseUri $BaseUri
-		}
-				
-	} else {
+			Get-EntryNode -Node $_ -BaseUri $BaseUri
+		}				
+	} elseif ($Xml.PSObject.Properties["entry"] -ne $null) {	
 		Write-Debug "Invoke-XmlApiRequest: Parsing as entry"
-		Parse-EntryNode -Node $Xml.entry -BaseUri $BaseUri
-	}	
+		Get-EntryNode -Node $Xml.entry -BaseUri $BaseUri
+	} else {
+		Write-Error "Invoke-XmlApiRequest: Cannot handle response for '$Uri'"	
+	}
 	
 }
 
@@ -251,9 +250,9 @@ Function Get-FormDigest {
 	Param(
 		[String] $BaseUri
 	)
-	#$Response = Invoke-WebRequest -Method  Post -Uri "$BaseUri/_api/contextinfo" -UseDefaultCredentials
-	#[Xml] $Content = $Response.Content
-	$Content = Invoke-XmlApiRequest -Uri "$BaseUri/_api/contextinfo" -Method "Post"
+	$Response = Invoke-WebRequest -Method  Post -Uri "$BaseUri/_api/contextinfo" -UseDefaultCredentials
+	[Xml] $Content = $Response.Content
+	
 	$Content.GetContextWebInformation.FormDigestValue
 }
 
