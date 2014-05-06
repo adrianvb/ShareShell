@@ -1,6 +1,9 @@
 ﻿# REST API reference and samples 
 #	http://msdn.microsoft.com/en-us/library/office/jj860569(v=office.15).aspx
 
+# Files and Folders
+#   http://msdn.microsoft.com/en-us/library/office/dn450841(v=office.15).aspx
+
 Function Get-EntryNode {
 <#
 .SYNOPSIS
@@ -141,11 +144,19 @@ Function Invoke-XmlApiRequest {
 	
 	[Xml] $Xml = $Result.Content -replace 'xmlns="http://www.w3.org/2005/Atom"'	
 	
+	# if there are no entries, $xml.feed.entry does not exist
 	if ($Xml.PSObject.Properties["feed"] -ne $null) {
-		Write-Debug ("Invoke-XmlApiRequest: Parsing as feed: {0} entries" -f $Xml.feed.entry.Count)
-		$Xml.feed.entry | ForEach-Object  {
-			Get-EntryNode -Node $_ -BaseUri $BaseUri
-		}				
+	
+		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {
+			Write-Debug ("Invoke-XmlApiRequest: Parsing as feed: {0} entries" -f $Xml.feed.entry.Count)
+		
+			$Xml.feed.entry | ForEach-Object  {
+				Get-EntryNode -Node $_ -BaseUri $BaseUri
+			}
+		} else {
+			Write-Debug ("Invoke-XmlApiRequest: No entries for '{0}'" -f $Uri)
+		}
+		
 	} elseif ($Xml.PSObject.Properties["entry"] -ne $null) {	
 		Write-Debug "Invoke-XmlApiRequest: Parsing as entry"
 		Get-EntryNode -Node $Xml.entry -BaseUri $BaseUri
