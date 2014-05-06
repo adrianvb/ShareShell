@@ -37,8 +37,8 @@ This function handles parsing the XML nodes returned by the api
 			if ($_.PSObject.Properties["type"] -ne $null) {			
 				$Value = Switch($_.Type) {
 					'Edm.Boolean' { [Boolean] $Value }
-					'Edm.Int16' { [Int] $Value }
-					'Edm.Int32' { [Int] $Value }
+					'Edm.Int16' { [Decimal] $Value }
+					'Edm.Int32' { [Decimal] $Value }
 					'Edm.DateTime' { [DateTime] $Value }
 					default { [String] $Value }
 				}
@@ -146,9 +146,11 @@ Function Invoke-XmlApiRequest {
 	
 	# if there are no entries, $xml.feed.entry does not exist
 	if ($Xml.PSObject.Properties["feed"] -ne $null) {
-	
+		
+		Write-Host ($Uri)
+		
 		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {
-			Write-Debug ("Invoke-XmlApiRequest: Parsing as feed: {0} entries" -f $Xml.feed.entry.Count)
+			Write-Debug ("Invoke-XmlApiRequest: Parsing as feed")
 		
 			$Xml.feed.entry | ForEach-Object  {
 				Get-EntryNode -Node $_ -BaseUri $BaseUri
