@@ -5,6 +5,7 @@ Use PowerShell to query SharePoint 2013 REST Api from anywhere
 
 Usage
 -----
+the following example assumes that the current user has permissions to access SharePoint
 
 ```
 Import-Module ShareShell
@@ -20,8 +21,12 @@ $List = $Web.Lists('Benutzerinformationsliste')
 $Filter = {$_.Modified -gt (Get-Date).AddDays(-260)}
 $QueryOpt = @{ "top"=10}
 $List.Items($Filter, $QueryOpt)
-$List.Items())
+$List.Items($null, $QueryOpt)
+
+$List.__ApiMethods
 ```
+
+the SharePoint API returns all 
 
 Links
 -----
