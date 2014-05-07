@@ -13,7 +13,8 @@ This function handles parsing the XML nodes returned by the api
 	[CmdletBinding()]
 	Param (
 		[System.Xml.XmlElement] $Node,
-		[String] $BaseUri
+		[String] $BaseUri,
+		[Switch] $EnableCaching
 	)			
 	
 	$NameSpaces = @{
@@ -87,7 +88,9 @@ This function handles parsing the XML nodes returned by the api
 				
 				# if this property is not cached, we request it and add it as cached property
 				# removing the cached property would reset this propertys state
-				if ($This.$PropertyCacheName -eq $null) {
+				if ($This.$PropertyCacheName -ne $null -and $EnableCaching) {
+					$Response = $This.$PropertyCacheName
+				} else {
 					$Parameters = @()
 					$Options.Keys | ForEach-Object {
 						$Parameters += ("`${0}={1}" -f $_, $Options[$_])
@@ -95,10 +98,11 @@ This function handles parsing the XML nodes returned by the api
 				
 					$RequestUri = $EntryUri + "?" + [String]::Join("&", $Parameters)			
 					$Response = Invoke-XmlApiRequest -Uri $RequestUri
-					$This | Add-Member -MemberType NoteProperty -Name "$PropertyCacheName" -Value $Response -Force
-				} else {
-					$Response = $This.$PropertyCacheName
-				}
+					
+					if ($EnableCaching) {					
+						$This | Add-Member -MemberType NoteProperty -Name "$PropertyCacheName" -Value $Response -Force
+					} 
+				}			
 				
 				# filter is nifty
 				if ($Filter -ne $null) {
@@ -128,7 +132,8 @@ Function Invoke-XmlApiRequest {
 	[CmdletBinding()]
 	Param(
 		[String] $Uri,
-		[String] $Method = 'Get'
+		[String] $Method = 'Get',
+		[Switch] $EnableCaching
 	)
 			
 	Write-Debug ("Invoke-XmlApiRequest: Requesting {0}" -f $Uri)
@@ -147,13 +152,10 @@ Function Invoke-XmlApiRequest {
 	# if there are no entries, $xml.feed.entry does not exist
 	if ($Xml.PSObject.Properties["feed"] -ne $null) {
 		
-		Write-Host ($Uri)
-		
-		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {
-			Write-Debug ("Invoke-XmlApiRequest: Parsing as feed")
-		
+		Write-Debug ("Invoke-XmlApiRequest: Parsing as feed")
+		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {				
 			$Xml.feed.entry | ForEach-Object  {
-				Get-EntryNode -Node $_ -BaseUri $BaseUri
+				Get-EntryNode -Node $_ -BaseUri $BaseUri -EnableCaching:$EnableCaching
 			}
 		} else {
 			Write-Debug ("Invoke-XmlApiRequest: No entries for '{0}'" -f $Uri)
@@ -161,7 +163,7 @@ Function Invoke-XmlApiRequest {
 		
 	} elseif ($Xml.PSObject.Properties["entry"] -ne $null) {	
 		Write-Debug "Invoke-XmlApiRequest: Parsing as entry"
-		Get-EntryNode -Node $Xml.entry -BaseUri $BaseUri
+		Get-EntryNode -Node $Xml.entry -BaseUri $BaseUri -EnableCaching:$EnableCaching
 	} else {
 		Write-Error "Invoke-XmlApiRequest: Cannot handle response for '$Uri'"	
 	}
@@ -260,7 +262,7 @@ Function New-ListItem {
 }
 
 Function Get-FormDigest {
-	Param(
+	Param (
 		[String] $BaseUri
 	)
 	$Response = Invoke-WebRequest -Method  Post -Uri "$BaseUri/_api/contextinfo" -UseDefaultCredentials
