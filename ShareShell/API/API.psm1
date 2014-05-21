@@ -85,27 +85,24 @@ This function handles parsing the XML nodes returned by the api
 			$ScriptClosure = { 
 				Param(
 					$Filter = $null,
-					$Options = @{"top" = 1000},
 					[Switch] $EnableCaching = $false
 				);					
-				Write-Debug "Invoke-XmlApiRequest: Property $PropertyName($Filter)"
+				Write-Debug "Invoke-XmlApiRequest: Property $PropertyName"
+				
+				
 				
 				# property name: Items(), Lists()
 				$PropertyName = $Name
 				
 				# we cache every response using another property
 				$PropertyCacheName = "Cache_$PropertyName"
-														
-				
+																		
 				# if this property is not cached, we request it and add it as cached property
 				# removing the cached property would reset this propertys state
 				if ($This.__ApiCache[$PropertyCacheName] -ne $null -and $EnableCaching) {
 					$Response = $This.__ApiCache[$PropertyCacheName]
 				} else {
-					$Parameters = @()
-					$Options.Keys | ForEach-Object {
-						$Parameters += ("`${0}={1}" -f $_, $Options[$_])
-					}
+					$Parameters = @("$top=1000")
 				
 					$RequestUri = $EntryUri + "?" + [String]::Join("&", $Parameters)			
 					$Response = Invoke-XmlApiRequest -Uri $RequestUri
@@ -116,14 +113,11 @@ This function handles parsing the XML nodes returned by the api
 				}			
 				
 				# filter is nifty
-				if ($Filter -ne $null) {
-				
-					if ($Filter.GetType().Name -eq "ScriptBlock") {
-						$Response = $Response | Where-Object $Filter
-					} else {
-						$Response = $Response | Where-Object { $_.Title -like $Filter -or $_.Name -like $Filter }
+				if ($Filter -ne $null) {				
+					if ($Filter -is [String]) {
+						$Filter = { $_.Title -like $Filter -or $_.Name -like $Filter }.GetNewClosure()
 					}
-					
+					$Response = $Response | Where-Object $Filter					
 				}
 				$Response
 				
@@ -145,13 +139,13 @@ This function handles parsing the XML nodes returned by the api
 		
 		# enable caching for this lookup
 		#$List = $This.ParentList($null, $null, $true)		
-		$List = $This.ParentList($null, @{}, $true)
+		$List = $This.ParentList($null, $true)
 		Write-Host ($List | Format-List | Out-String)
 	
 		# we need $ParentWebUrl for:
 		# 	a) build the update uri 
 		#	b) fetch the request digest (below)
-		$ParentWebUrl = $List.ParentWeb($null, @{}, $true).Url
+		$ParentWebUrl = $List.ParentWeb($null, $true).Url
 		
 		# this is our update uri
 		$UpdateUri = "{0}/_api/Lists(guid'{1}')/Items({2})" -f $ParentWebUrl, $List.Id, $This.Id
