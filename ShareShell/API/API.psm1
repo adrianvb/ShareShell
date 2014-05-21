@@ -1,5 +1,6 @@
 ﻿# REST API reference and samples 
 #	http://msdn.microsoft.com/en-us/library/office/jj860569(v=office.15).aspx
+#	http://msdn.microsoft.com/en-us/magazine/dn198245.aspx
 
 # Files and Folders
 #   http://msdn.microsoft.com/en-us/library/office/dn450841(v=office.15).aspx
@@ -23,8 +24,13 @@ This function handles parsing the XML nodes returned by the api
 		d="http://schemas.microsoft.com/ado/2007/08/dataservices"
 	}
 	
-	$Properties = @{}
+	$Properties = @{
+		"__ApiCache" = @{}
+	}
 	
+	#
+	# this block parses the content part of the xml response
+	#
 	
 	$XmlParseTime = Measure-Command {		
 		# 70x faster than Select-Xml
@@ -51,7 +57,10 @@ This function handles parsing the XML nodes returned by the api
 	
 	$Data = New-Object -TypeName PsObject -Property $Properties
 	
-			
+	#
+	# this block parses the link part of the xml response
+	#
+	
 	$MethodProperties = @()
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
 		$Name = $_.Title
@@ -59,6 +68,7 @@ This function handles parsing the XML nodes returned by the api
 		
 		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {
 			
+			# uris in the api are inconsisten: sometimes absolute, sometimes relative
 			# proper uri handling would be nice, system.uri makes me cry
 			if ($_.href -like "http*") {
 				$EntryUri = $_.href
@@ -75,7 +85,8 @@ This function handles parsing the XML nodes returned by the api
 			$ScriptClosure = { 
 				Param(
 					$Filter = $null,
-					$Options = @{"top" = 1000}
+					$Options = @{"top" = 1000},
+					[Switch] $EnableCaching = $false
 				);					
 				Write-Debug "Invoke-XmlApiRequest: Property $PropertyName($Filter)"
 				
@@ -83,13 +94,13 @@ This function handles parsing the XML nodes returned by the api
 				$PropertyName = $Name
 				
 				# we cache every response using another property
-				$PropertyCacheName = "__$PropertyName"
+				$PropertyCacheName = "Cache_$PropertyName"
 														
 				
 				# if this property is not cached, we request it and add it as cached property
 				# removing the cached property would reset this propertys state
-				if ($This.$PropertyCacheName -ne $null -and $EnableCaching) {
-					$Response = $This.$PropertyCacheName
+				if ($This.__ApiCache[$PropertyCacheName] -ne $null -and $EnableCaching) {
+					$Response = $This.__ApiCache[$PropertyCacheName]
 				} else {
 					$Parameters = @()
 					$Options.Keys | ForEach-Object {
@@ -100,7 +111,7 @@ This function handles parsing the XML nodes returned by the api
 					$Response = Invoke-XmlApiRequest -Uri $RequestUri
 					
 					if ($EnableCaching) {					
-						$This | Add-Member -MemberType NoteProperty -Name "$PropertyCacheName" -Value $Response -Force
+						$This.__ApiCache[$PropertyCacheName] = $Response
 					} 
 				}			
 				
@@ -125,6 +136,68 @@ This function handles parsing the XML nodes returned by the api
 	}
 	
 	$Data | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $MethodProperties -Force
+	
+	#
+	# this block adds update statements if type is entry
+	#
+	
+	$Data | Add-Member -MemberType ScriptMethod -Name "Update" -Value ({
+		
+		# enable caching for this lookup
+		#$List = $This.ParentList($null, $null, $true)		
+		$List = $This.ParentList($null, @{}, $true)
+		Write-Host ($List | Format-List | Out-String)
+	
+		# we need $ParentWebUrl for:
+		# 	a) build the update uri 
+		#	b) fetch the request digest (below)
+		$ParentWebUrl = $List.ParentWeb($null, @{}, $true).Url
+		
+		# this is our update uri
+		$UpdateUri = "{0}/_api/Lists(guid'{1}')/Items({2})" -f $ParentWebUrl, $List.Id, $This.Id
+		
+		# Request digest for authtentication
+		$RequestDigest = Get-FormDigest -BaseUri $ParentWebUrl
+		
+		$Temp = $This
+		$Temp | Add-Member -MemberType NoteProperty -Name "__metadata" -Value @{ 
+			'type' = $List.ListItemEntityTypeFullName
+		}				
+		
+		$Temp.PSObject.Properties.Remove('__ApiMethods')
+		$Temp.PSObject.Properties.Remove('__ApiCache')
+		#"Attachments", "Created", "GUID", "EditorId", "FileSystemObjectType", "Modified", "OData__UIVersionString", "ContentTypeId" | ForEach-Object { $Temp.PSObject.Properties.Remove($_) }
+		
+		$Headers =  @{
+			"Accept" = "application/json; odata=verbose" 
+			"X-RequestDigest" = $RequestDigest
+			"X-HTTP-Method" = "MERGE"
+			"If-Match" = "*"
+		}		
+		
+		# let's do it
+		$Response = $null		
+		Try {
+		
+			Write-Host ($Temp | Format-List | Out-String)
+		
+			$Response = Invoke-WebRequest `
+				-Body ($Temp | ConvertTo-Json) `
+				-Method POST `
+				-UseDefaultCredentials `
+				-ContentType "application/json; odata=verbose" `
+				-Uri $UpdateUri `
+				-Headers $Headers `
+				-ErrorAction Inquire
+		} Catch {
+			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
+		}
+		
+		$Response
+	
+	}.GetNewClosure())
+	
+	
 	$Data 
 }	
 
@@ -178,7 +251,8 @@ Function New-ListItem {
 
 	Param(
 		[Parameter(Mandatory=$true)] $List,
-		$Fields = $null
+		$Fields = $null,
+		$ElementTypeName = "Element"
 	)
 	
 	# we need $ParentWebUrl for:
@@ -191,7 +265,7 @@ Function New-ListItem {
 	
 	# fetch fields if not passed as parameter
 	if ($Fields -eq $null) {
-		$ContentType = $List.ContentTypes({$_.Name -like "Element"}) | Select-Object -First 1
+		$ContentType = $List.ContentTypes({$_.Name -like $ElementTypeName}) | Select-Object -First 1
 		$Fields = $ContentType.Fields()
 	}
 	
@@ -209,26 +283,15 @@ Function New-ListItem {
 	$Fields | Where-Object { 
 		$_.TypeAsString -ne "Calculated" -and $_.TypeAsString -ne "Computed" 
 	} | ForEach-Object {
-		$Properties[$_.InternalName] = $null
-		
-		if ($_.Required) {
-			$RequiredFields += $_.Title
-		}
+		$Properties[$_.InternalName] = $null		
 	}
 	
 
 	$Item = New-Object -TypeName PSObject -Property $Properties	
 	$Item | Add-Member -MemberType ScriptMethod -Name "Update" -Value {
-		
-		$This.__required | ForEach-Object {
-			if ($This.$_ -eq $null) {
-				Write-Error "ListItem: Cannot uppdate, '$_' is empty"
-			}
-		}
 	
 		# we need to remove all custom properties before sharepoint likes it
 		$Temp = $This
-		$Temp.PSObject.Properties.Remove('__required')
 		
 		# the request digest is used to prevent replay attacks
 		$RequestDigest = Get-FormDigest -BaseUri $ParentWebUrl
