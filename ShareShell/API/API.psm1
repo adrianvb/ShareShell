@@ -59,15 +59,20 @@ This function handles parsing the XML nodes returned by the api
 	
 	#
 	# this block parses the link part of the xml response
+	# each link will be represented as a function of this objects
 	#
 	
 	$MethodProperties = @()
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
-		$Name = $_.Title
-		$MethodProperties += $Name
-		
+	
 		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {
 			
+			# property name: Items, Lists, SiteUsers, ...
+			$PropertyName = $_.Title
+			
+			$MethodProperties += $PropertyName
+
+	
 			# uris in the api are inconsisten: sometimes absolute, sometimes relative
 			# proper uri handling would be nice, system.uri makes me cry
 			if ($_.href -like "http*") {
@@ -87,20 +92,14 @@ This function handles parsing the XML nodes returned by the api
 					$Filter = $null,
 					[Switch] $EnableCaching = $false
 				);					
-				Write-Debug "Invoke-XmlApiRequest: Property $PropertyName"
-				
-				
-				
-				# property name: Items(), Lists()
-				$PropertyName = $Name
+				Write-Debug "Invoke-XmlApiRequest: Property $PropertyName"																				
 				
 				# we cache every response using another property
-				$PropertyCacheName = "Cache_$PropertyName"
 																		
 				# if this property is not cached, we request it and add it as cached property
 				# removing the cached property would reset this propertys state
-				if ($This.__ApiCache[$PropertyCacheName] -ne $null -and $EnableCaching) {
-					$Response = $This.__ApiCache[$PropertyCacheName]
+				if ($This.__ApiCache[$PropertyName] -ne $null -and $EnableCaching) {
+					$Response = $This.__ApiCache[$PropertyName]
 				} else {
 					$Parameters = @("$top=1000")
 				
@@ -108,7 +107,7 @@ This function handles parsing the XML nodes returned by the api
 					$Response = Invoke-XmlApiRequest -Uri $RequestUri
 					
 					if ($EnableCaching) {					
-						$This.__ApiCache[$PropertyCacheName] = $Response
+						$This.__ApiCache[$PropertyName] = $Response
 					} 
 				}			
 				
