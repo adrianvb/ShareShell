@@ -63,15 +63,16 @@ This function handles parsing the XML nodes returned by the api
 	#
 	
 	$MethodProperties = @()
+		
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
+		
 	
 		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {
 			
 			# property name: Items, Lists, SiteUsers, ...
 			$PropertyName = $_.Title
-			
+						
 			$MethodProperties += $PropertyName
-
 	
 			# uris in the api are inconsisten: sometimes absolute, sometimes relative
 			# proper uri handling would be nice, system.uri makes me cry
@@ -119,10 +120,10 @@ This function handles parsing the XML nodes returned by the api
 					$Response = $Response | Where-Object $Filter					
 				}
 				$Response
-				
+
 			}.GetNewClosure()
 										
-			$Data | Add-Member -MemberType ScriptMethod -Name $Name -Value $ScriptClosure -Force
+			$Data | Add-Member -MemberType ScriptMethod -Name $PropertyName -Value $ScriptClosure -Force
 						
 			
 		}
