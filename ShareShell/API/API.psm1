@@ -172,14 +172,15 @@ This function handles parsing the XML nodes returned by the api
 		}		
 		
 		# let's do it
-		$Response = $null		
+		$Response = $null
 		Try {
+			$Body = [System.Text.Encoding]::UTF8.GetBytes(($Temp | ConvertTo-Json))
 				
 			$Response = Invoke-WebRequest `
-				-Body ($Temp | ConvertTo-Json) `
+				-Body $Body `
 				-Method POST `
 				-UseDefaultCredentials `
-				-ContentType "application/json; odata=verbose" `
+				-ContentType "application/json; odata=verbose; charset=utf-8" `
 				-Uri $UpdateUri `
 				-Headers $Headers `
 				-ErrorAction Inquire
@@ -187,7 +188,7 @@ This function handles parsing the XML nodes returned by the api
 			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
 		}
 		
-		$Response
+		
 	
 	}.GetNewClosure())
 	
