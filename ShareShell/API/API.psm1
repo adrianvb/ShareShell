@@ -31,15 +31,16 @@ This function handles parsing the XML nodes returned by the api
 	#
 	# this block parses the content part of the xml response
 	#
-	
-	$XmlParseTime = Measure-Command {		
-		# 70x faster than Select-Xml
-		$Node.content.properties.ChildNodes | Where-Object { 
-			($_ -ne $null)	-and ($_.PSObject.Properties["#text"] -ne $null)
-		} | ForEach-Object {
+		
+	# 70x faster than Select-Xml
+	if ($Node.content.properties.ChildNodes.Count -gt 0) {
+		$Node.content.properties.ChildNodes | ForEach-Object {	
+			$Name = $_.ToString()
 			
-			$Name = $_.ToString()			
-			$Value = $_."#text"	
+			$Value = $null
+			if ($_.PSObject.Properties["#text"] -ne $null) {
+				$Value = $_."#text"	
+			} 
 			
 			if ($_.PSObject.Properties["type"] -ne $null) {			
 				$Value = Switch($_.Type) {
@@ -50,10 +51,12 @@ This function handles parsing the XML nodes returned by the api
 					default { [String] $Value }
 				}
 			}
+			
 			$Properties[$Name] = $Value
 		}					
-	} 
-	Write-Debug ("Get-EntryNode: parse time {0}ms" -f $XmlParseTime.Milliseconds)
+	}
+	
+	
 	
 	$Data = New-Object -TypeName PsObject -Property $Properties
 	
