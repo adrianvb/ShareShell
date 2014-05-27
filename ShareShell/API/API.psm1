@@ -105,7 +105,7 @@ This function handles parsing the XML nodes returned by the api
 				if ($This.__ApiCache[$PropertyName] -ne $null -and $EnableCaching) {
 					$Response = $This.__ApiCache[$PropertyName]
 				} else {
-					$Parameters = @("$top=1000")
+					$Parameters = @('$top=1000')
 				
 					$RequestUri = $EntryUri + "?" + [String]::Join("&", $Parameters)			
 					$Response = Invoke-XmlApiRequest -Uri $RequestUri
