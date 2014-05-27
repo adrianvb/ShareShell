@@ -143,7 +143,6 @@ This function handles parsing the XML nodes returned by the api
 		# enable caching for this lookup
 		#$List = $This.ParentList($null, $null, $true)		
 		$List = $This.ParentList($null, $true)
-		Write-Host ($List | Format-List | Out-String)
 	
 		# we need $ParentWebUrl for:
 		# 	a) build the update uri 
@@ -175,9 +174,7 @@ This function handles parsing the XML nodes returned by the api
 		# let's do it
 		$Response = $null		
 		Try {
-		
-			Write-Host ($Temp | Format-List | Out-String)
-		
+				
 			$Response = Invoke-WebRequest `
 				-Body ($Temp | ConvertTo-Json) `
 				-Method POST `
