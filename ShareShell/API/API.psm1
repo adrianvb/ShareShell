@@ -118,7 +118,12 @@ This function handles parsing the XML nodes returned by the api
 				# filter is nifty
 				if ($Filter -ne $null) {				
 					if ($Filter -is [String]) {
-						$Filter = { $_.Title -like $Filter -or $_.Name -like $Filter }.GetNewClosure()
+						$Filter = { 
+							$_.Title -like $Filter `
+							-or $_.Name -like $Filter `
+							-or $_.Guid -like $Filter `
+							-or $_.Id -like $Filter
+						}.GetNewClosure()
 					}
 					$Response = $Response | Where-Object $Filter					
 				}
