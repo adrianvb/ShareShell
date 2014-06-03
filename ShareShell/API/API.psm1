@@ -121,7 +121,7 @@ This function handles parsing the XML nodes returned by the api
 						$Filter = { 
 							$_.Title -like $Filter `
 							-or $_.Name -like $Filter `
-							-or $_.Guid -like $Filter `
+							-or $_.GUID -like $Filter `
 							-or $_.Id -like $Filter
 						}.GetNewClosure()
 					}
