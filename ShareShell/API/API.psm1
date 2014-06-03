@@ -44,7 +44,7 @@ This function handles parsing the XML nodes returned by the api
 			
 			if ($_.PSObject.Properties["type"] -ne $null) {			
 				$Value = Switch($_.Type) {
-					'Edm.Boolean' { [Boolean] $Value }
+					'Edm.Boolean' { if ($Value -eq "true") { $true} else { $false } }
 					'Edm.Int16' { [Decimal] $Value }
 					'Edm.Int32' { [Decimal] $Value }
 					'Edm.DateTime' { [DateTime] $Value }
