@@ -140,10 +140,14 @@ This function handles parsing the XML nodes returned by the api
 	$Item | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $MethodProperties -Force
 	
 	#
-	# this block adds update statements if type is entry
+	# Add CRUD if entry has a content type 
 	#
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Update"
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Delete"
+	if ($Item.PsObject.Properties["ContentTypeId"] -ne $null) {
+		Write-Object $Item
+	
+		$Item = Add-ApiMethod -Item $Item -List $Item.ParentList($null, $true) -Operation "Update"
+		$Item = Add-ApiMethod -Item $Item -List $Item.ParentList($null, $true) -Operation "Delete"
+	}
 	
 	$Item 
 }	
