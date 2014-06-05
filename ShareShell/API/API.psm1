@@ -5,6 +5,53 @@
 # Files and Folders
 #   http://msdn.microsoft.com/en-us/library/office/dn450841(v=office.15).aspx
 
+
+Function Invoke-XmlApiRequest {
+	[CmdletBinding()]
+	Param(
+		[String] $Uri,
+		[String] $Method = 'Get',
+		[Switch] $EnableCaching
+	)
+			
+	Write-Debug ("Invoke-XmlApiRequest: Requesting {0}" -f $Uri)
+	$Result = Invoke-WebRequest `
+		-Uri $Uri `
+		-UseDefaultCredentials `
+		-Method $Method
+		
+	if ($Uri -notmatch "(.*/_api)") {
+		Write-Error "Invoke-XmlApiRequest: /api missing in uri: '$Uri'"
+	}
+	$BaseUri = $Matches[1]
+		
+	[Xml] $Xml = $Result.Content -replace 'xmlns="http://www.w3.org/2005/Atom"'	
+	
+	# if there are no entries, $xml.feed.entry does not exist
+	if ($Xml.PSObject.Properties["feed"] -ne $null) {
+		
+		Write-Debug ("Invoke-XmlApiRequest: Parsing as feed")
+		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {
+			$Counter = 0
+			$Total = $Xml.feed.entry.Count
+			$Xml.feed.entry | ForEach-Object  {
+				$Counter += 1
+				Write-Progress -Activity "Fetching items" -PercentComplete (($Counter/$Total)*100)
+				ConvertFrom-ApiResponse -Node $_ -RequestUri $Uri -EnableCaching:$EnableCaching
+			}
+		} else {
+			Write-Debug ("Invoke-XmlApiRequest: No entries for '{0}'" -f $Uri)
+		}
+		
+	} elseif ($Xml.PSObject.Properties["entry"] -ne $null) {	
+		Write-Debug "Invoke-XmlApiRequest: Parsing as entry"
+		ConvertFrom-ApiResponse -Node $Xml.entry -RequestUri $Uri -EnableCaching:$EnableCaching
+	} else {
+		Write-Error "Invoke-XmlApiRequest: Cannot handle response for '$Uri'"	
+	}
+	
+}
+
 Function ConvertFrom-ApiResponse {
 <#
 .SYNOPSIS
@@ -14,7 +61,7 @@ This function handles parsing the XML nodes returned by the api
 	[CmdletBinding()]
 	Param (
 		[System.Xml.XmlElement] $Node,
-		[String] $BaseUri,
+		[String] $RequestUri,
 		[Switch] $EnableCaching
 	)			
 	
@@ -66,8 +113,10 @@ This function handles parsing the XML nodes returned by the api
 	# each link will be represented as a function of this objects
 	#
 	
+	$BaseUri = ($RequestUri -replace '/_api/.*', '') + '/_api'
+
 	$MethodProperties = @()
-		
+	
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
 	
 		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {
@@ -143,92 +192,19 @@ This function handles parsing the XML nodes returned by the api
 	# Add CRUD if entry has a content type 
 	#
 	if ($Item.PsObject.Properties["ContentTypeId"] -ne $null) {	
-		$Item = Add-ApiMethod -Item $Item -List $Item.ParentList($null, $true) -Operation "Update"
-		$Item = Add-ApiMethod -Item $Item -List $Item.ParentList($null, $true) -Operation "Delete"
+		$ParentListUri = $RequestUri -replace '/Items.*',''
+		
+		$ParentList = Get-CachedItem -Key $ParentListUri
+		if ($ParentList -eq $null) {
+			$ParentList = $Item.ParentList()
+			Add-CachedItem -Key $ParentListUri -Value $ParentList
+		}
+		$Item = Add-ApiMethod -Item $Item -List $ParentList -Operation "Update"
+		$Item = Add-ApiMethod -Item $Item -List $ParentList -Operation "Delete"
 	}
 	
 	$Item 
 }	
-
-Function Invoke-XmlApiRequest {
-	[CmdletBinding()]
-	Param(
-		[String] $Uri,
-		[String] $Method = 'Get',
-		[Switch] $EnableCaching
-	)
-			
-	Write-Debug ("Invoke-XmlApiRequest: Requesting {0}" -f $Uri)
-	$Result = Invoke-WebRequest `
-		-Uri $Uri `
-		-UseDefaultCredentials `
-		-Method $Method
-		
-	if ($Uri -notmatch "(.*/_api)") {
-		Write-Error "Invoke-XmlApiRequest: /api missing in uri: '$Uri'"
-	}
-	$BaseUri = $Matches[1]
-	
-	[Xml] $Xml = $Result.Content -replace 'xmlns="http://www.w3.org/2005/Atom"'	
-	
-	# if there are no entries, $xml.feed.entry does not exist
-	if ($Xml.PSObject.Properties["feed"] -ne $null) {
-		
-		Write-Debug ("Invoke-XmlApiRequest: Parsing as feed")
-		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {				
-			$Xml.feed.entry | ForEach-Object  {
-				ConvertFrom-ApiResponse -Node $_ -BaseUri $BaseUri -EnableCaching:$EnableCaching
-			}
-		} else {
-			Write-Debug ("Invoke-XmlApiRequest: No entries for '{0}'" -f $Uri)
-		}
-		
-	} elseif ($Xml.PSObject.Properties["entry"] -ne $null) {	
-		Write-Debug "Invoke-XmlApiRequest: Parsing as entry"
-		ConvertFrom-ApiResponse -Node $Xml.entry -BaseUri $BaseUri -EnableCaching:$EnableCaching
-	} else {
-		Write-Error "Invoke-XmlApiRequest: Cannot handle response for '$Uri'"	
-	}
-	
-}
-
-Function New-ListItem {
-	<#
-	.LINKS
-	http://www.plusconsulting.com/blog/2013/05/crud-on-list-items-using-rest-services-jquery/
-	#>
-
-	Param(
-		[Parameter(Mandatory=$true)] $List,
-		$Fields = $null,
-		$ElementTypeName = "Element"
-	)
-	
-	# we need $ParentWebUrl for:
-	# 	a) build the update uri 
-	#	b) fetch the request digest (below)
-	$ParentWebUrl = $List.ParentWeb().Url
-	
-	# fetch fields if not passed as parameter
-	if ($Fields -eq $null) {
-		$ContentType = $List.ContentTypes({$_.Name -like $ElementTypeName}) | Select-Object -First 1
-		$Fields = $ContentType.Fields()
-	}
-	
-	$Properties = @{}
-	$Fields | Where-Object { 
-		$_.TypeAsString -ne "Calculated" -and $_.TypeAsString -ne "Computed" 
-	} | ForEach-Object {
-		$Properties[$_.InternalName] = $null		
-	}
-	
-	$Item = New-Object -TypeName PSObject -Property $Properties	
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Create"	
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Update"
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Delete"
-	
-	$Item
-}
 
 Function Add-ApiMethod {
 	Param(
@@ -317,6 +293,45 @@ Function Add-ApiMethod {
 	$Item | Add-Member -MemberType ScriptMethod -Name $Operation -Value $ScriptBlock
 	$Item
 }
+
+Function New-ListItem {
+	<#
+	.LINKS
+	http://www.plusconsulting.com/blog/2013/05/crud-on-list-items-using-rest-services-jquery/
+	#>
+
+	Param(
+		[Parameter(Mandatory=$true)] $List,
+		$Fields = $null,
+		$ElementTypeName = "Element"
+	)
+	
+	# we need $ParentWebUrl for:
+	# 	a) build the update uri 
+	#	b) fetch the request digest (below)
+	$ParentWebUrl = $List.ParentWeb().Url
+	
+	# fetch fields if not passed as parameter
+	if ($Fields -eq $null) {
+		$ContentType = $List.ContentTypes({$_.Name -like $ElementTypeName}) | Select-Object -First 1
+		$Fields = $ContentType.Fields()
+	}
+	
+	$Properties = @{}
+	$Fields | Where-Object { 
+		$_.TypeAsString -ne "Calculated" -and $_.TypeAsString -ne "Computed" 
+	} | ForEach-Object {
+		$Properties[$_.InternalName] = $null		
+	}
+	
+	$Item = New-Object -TypeName PSObject -Property $Properties	
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Create"	
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Update"
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Delete"
+	
+	$Item
+}
+
 
 Set-StrictMode -Version Latest
 #Export-ModuleMember ("Invoke-XmlApiRequest", "New-ListItem")
