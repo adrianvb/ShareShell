@@ -142,9 +142,7 @@ This function handles parsing the XML nodes returned by the api
 	#
 	# Add CRUD if entry has a content type 
 	#
-	if ($Item.PsObject.Properties["ContentTypeId"] -ne $null) {
-		Write-Object $Item
-	
+	if ($Item.PsObject.Properties["ContentTypeId"] -ne $null) {	
 		$Item = Add-ApiMethod -Item $Item -List $Item.ParentList($null, $true) -Operation "Update"
 		$Item = Add-ApiMethod -Item $Item -List $Item.ParentList($null, $true) -Operation "Delete"
 	}
