@@ -5,7 +5,7 @@
 # Files and Folders
 #   http://msdn.microsoft.com/en-us/library/office/dn450841(v=office.15).aspx
 
-Function Get-EntryNode {
+Function ConvertFrom-ApiResponse {
 <#
 .SYNOPSIS
 This function handles parsing the XML nodes returned by the api
@@ -29,6 +29,7 @@ This function handles parsing the XML nodes returned by the api
 	}
 	
 	#
+	# PROPERTIES
 	# this block parses the content part of the xml response
 	#
 		
@@ -54,12 +55,12 @@ This function handles parsing the XML nodes returned by the api
 			
 			$Properties[$Name] = $Value
 		}					
-	}
-	
-	
+	}	
 	
 	$Item = New-Object -TypeName PsObject -Property $Properties
 	
+	#
+	# METHODS
 	#
 	# this block parses the link part of the xml response
 	# each link will be represented as a function of this objects
@@ -68,7 +69,6 @@ This function handles parsing the XML nodes returned by the api
 	$MethodProperties = @()
 		
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
-		
 	
 		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {
 			
@@ -175,7 +175,7 @@ Function Invoke-XmlApiRequest {
 		Write-Debug ("Invoke-XmlApiRequest: Parsing as feed")
 		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {				
 			$Xml.feed.entry | ForEach-Object  {
-				Get-EntryNode -Node $_ -BaseUri $BaseUri -EnableCaching:$EnableCaching
+				ConvertFrom-ApiResponse -Node $_ -BaseUri $BaseUri -EnableCaching:$EnableCaching
 			}
 		} else {
 			Write-Debug ("Invoke-XmlApiRequest: No entries for '{0}'" -f $Uri)
@@ -183,7 +183,7 @@ Function Invoke-XmlApiRequest {
 		
 	} elseif ($Xml.PSObject.Properties["entry"] -ne $null) {	
 		Write-Debug "Invoke-XmlApiRequest: Parsing as entry"
-		Get-EntryNode -Node $Xml.entry -BaseUri $BaseUri -EnableCaching:$EnableCaching
+		ConvertFrom-ApiResponse -Node $Xml.entry -BaseUri $BaseUri -EnableCaching:$EnableCaching
 	} else {
 		Write-Error "Invoke-XmlApiRequest: Cannot handle response for '$Uri'"	
 	}
@@ -297,7 +297,7 @@ Function Add-ApiMethod {
 
 		if ($Operation -eq "Create") {
 			$Node = [Xml] $Response.Content
-			$ResponseItem = Get-EntryNode -Node $Node.entry -BaseUri $ParentWebUrl
+			$ResponseItem = ConvertFrom-ApiResponse -Node $Node.entry -BaseUri $ParentWebUrl
 			
 			$ResponseItem.PsObject.Properties | ForEach {
 				$Prop = $_
