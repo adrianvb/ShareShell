@@ -58,7 +58,7 @@ This function handles parsing the XML nodes returned by the api
 	
 	
 	
-	$Data = New-Object -TypeName PsObject -Property $Properties
+	$Item = New-Object -TypeName PsObject -Property $Properties
 	
 	#
 	# this block parses the link part of the xml response
@@ -131,74 +131,21 @@ This function handles parsing the XML nodes returned by the api
 
 			}.GetNewClosure()
 										
-			$Data | Add-Member -MemberType ScriptMethod -Name $PropertyName -Value $ScriptClosure -Force
+			$Item | Add-Member -MemberType ScriptMethod -Name $PropertyName -Value $ScriptClosure -Force
 						
 			
 		}
 	}
 	
-	$Data | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $MethodProperties -Force
+	$Item | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $MethodProperties -Force
 	
 	#
 	# this block adds update statements if type is entry
 	#
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Update"
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Delete"
 	
-	$Data | Add-Member -MemberType ScriptMethod -Name "Update" -Value ({
-		
-		# enable caching for this lookup
-		#$List = $This.ParentList($null, $null, $true)		
-		$List = $This.ParentList($null, $true)
-	
-		# we need $ParentWebUrl for:
-		# 	a) build the update uri 
-		#	b) fetch the request digest (below)
-		$ParentWebUrl = $List.ParentWeb($null, $true).Url
-		
-		# this is our update uri
-		$UpdateUri = "{0}/_api/Lists(guid'{1}')/Items({2})" -f $ParentWebUrl, $List.Id, $This.Id
-		
-		# Request digest for authtentication
-		$RequestDigest = Get-FormDigest -BaseUri $ParentWebUrl
-		
-		$Temp = $This
-		$Temp | Add-Member -MemberType NoteProperty -Name "__metadata" -Value @{ 
-			'type' = $List.ListItemEntityTypeFullName
-		}				
-		
-		$Temp.PSObject.Properties.Remove('__ApiMethods')
-		$Temp.PSObject.Properties.Remove('__ApiCache')
-		#"Attachments", "Created", "GUID", "EditorId", "FileSystemObjectType", "Modified", "OData__UIVersionString", "ContentTypeId" | ForEach-Object { $Temp.PSObject.Properties.Remove($_) }
-		
-		$Headers =  @{
-			"Accept" = "application/json; odata=verbose" 
-			"X-RequestDigest" = $RequestDigest
-			"X-HTTP-Method" = "MERGE"
-			"If-Match" = "*"
-		}		
-		
-		# let's do it
-		$Response = $null
-		Try {
-			$Body = [System.Text.Encoding]::UTF8.GetBytes(($Temp | ConvertTo-Json))
-				
-			$Response = Invoke-WebRequest `
-				-Body $Body `
-				-Method POST `
-				-UseDefaultCredentials `
-				-ContentType "application/json; odata=verbose; charset=utf-8" `
-				-Uri $UpdateUri `
-				-Headers $Headers `
-				-ErrorAction Inquire
-		} Catch {
-			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
-		}
-		
-		
-	
-	}.GetNewClosure())
-	
-	
-	$Data 
+	$Item 
 }	
 
 Function Invoke-XmlApiRequest {
@@ -260,69 +207,28 @@ Function New-ListItem {
 	#	b) fetch the request digest (below)
 	$ParentWebUrl = $List.ParentWeb().Url
 	
-	# this is our update uri
-	$UpdateUri = "{0}/_api/Lists(guid'{1}')/Items" -f $ParentWebUrl, $List.Id
-	
 	# fetch fields if not passed as parameter
 	if ($Fields -eq $null) {
 		$ContentType = $List.ContentTypes({$_.Name -like $ElementTypeName}) | Select-Object -First 1
 		$Fields = $ContentType.Fields()
 	}
 	
-	# we store fields that are flagged as "required"
-	$RequiredFields = @()
-	
-	# this is were the data lives
 	$Properties = @{}
-	$Properties['__required'] = $RequiredFields
-	$Properties['__metadata'] = @{ 
-		'type' = $List.ListItemEntityTypeFullName
-	}
-	
-	# Skip calculated fields
 	$Fields | Where-Object { 
 		$_.TypeAsString -ne "Calculated" -and $_.TypeAsString -ne "Computed" 
 	} | ForEach-Object {
+		Write-Host ($_ | fl | Out-String)
 		$Properties[$_.InternalName] = $null		
 	}
 	
-
 	$Item = New-Object -TypeName PSObject -Property $Properties	
-	$Item | Add-Member -MemberType ScriptMethod -Name "Update" -Value {
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Create"	
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Update"
+	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Delete"
 	
-		# we need to remove all custom properties before sharepoint likes it
-		$Temp = $This
-		
-		# the request digest is used to prevent replay attacks
-		$RequestDigest = Get-FormDigest -BaseUri $ParentWebUrl
-		
-		$Headers =  @{
-			"accept" = "application/json; odata=verbose" 
-			"content-type" = "application/json; odata=verbose"
-			'X-RequestDigest' = $RequestDigest
-		}		
-		
-		# let's do it
-		$Response = $null		
-		Try {
-			$Response = Invoke-WebRequest `
-				-Body ($Temp | ConvertTo-Json) `
-				-Method Post `
-				-UseDefaultCredentials `
-				-ContentType "application/json; odata=verbose" `
-				-Uri $UpdateUri `
-				-Headers $Headers `
-				-ErrorAction Inquire
-		} Catch {
-			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
-		}
-		
-		$Response
-			
-	}.GetNewClosure()
-	
-	$Item	
+	$Item
 }
+
 
 Function Get-FormDigest {
 	Param (
@@ -356,6 +262,94 @@ Function Get-FormDigest {
 	$Token["FormDigest"]
 }
 
+Function Add-ApiMethod {
+	Param(
+		[Parameter(Mandatory=$true)] [ValidateSet("Create","Update","Delete")] [String] $Operation,
+		[Parameter(Mandatory=$true)] [Object] $List,
+		[Parameter(Mandatory=$true)] $Item,
+		
+		[String] $ParentWebUrl = $List.ParentWeb($null, $true).Url		
+	)
+	
+	$ScriptBlock = {
+
+		$TempItem = $Item
+		
+		# Request digest for authtentication
+		$RequestDigest = Get-FormDigest -BaseUri $ParentWebUrl
+		
+		$Headers =  @{
+			"Accept" = "application/xml; odata=verbose" 
+			"X-RequestDigest" = $RequestDigest			
+			"If-Match" = "*"
+		}				
+		
+		$Uri = "{0}/_api/Lists(guid'{1}')/Items" -f $ParentWebUrl, $List.Id
+		
+		if ($Operation -eq "Update") {
+			$Uri = "{0}/_api/Lists(guid'{1}')/Items({2})" -f $ParentWebUrl, $List.Id, $This.Id
+			$Headers["X-HTTP-Method"] = "MERGE"
+		}
+		if ($Operation -eq "Delete") {
+			$Uri = "{0}/_api/Lists(guid'{1}')/Items({2})" -f $ParentWebUrl, $List.Id, $This.Id
+			$Headers["X-HTTP-Method"] = "DELETE"
+		}
+		
+		
+		if ($TempItem.PsObject.Properties["__metadata"] -eq $null) {
+			$TempItem | Add-Member -MemberType NoteProperty -Name "__metadata" -Value @{ 
+				'type' = $List.ListItemEntityTypeFullName
+			}
+		}
+	
+		# Remove api properies
+		$TempItem.PSObject.Properties.Remove('__ApiMethods')
+		$TempItem.PSObject.Properties.Remove('__ApiCache')
+				
+		# let's do it
+		$Method = "POST"
+		$ContentType = "application/json; odata=verbose; charset=utf-8"
+		$Body = [System.Text.Encoding]::UTF8.GetBytes(($TempItem | ConvertTo-Json))
+		$Response = $null	
+
+		Try {
+			$Response = Invoke-WebRequest `
+				-Body $Body `
+				-Method POST `
+				-UseDefaultCredentials `
+				-ContentType $ContentType `
+				-Uri $Uri `
+				-Headers $Headers `
+				-ErrorAction Inquire					
+			
+		} Catch {
+			Write-Host ($_ | Fl | Out-String)
+			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
+		}
+
+
+		if ($Operation -eq "Create") {
+			$Node = [Xml] $Response.Content
+			$ResponseItem = Get-EntryNode -Node $Node.entry -BaseUri $ParentWebUrl
+			
+			$ResponseItem.PsObject.Properties | ForEach {
+				$Prop = $_
+				
+				# i don't know why
+				if ($Prop -eq $nul) {
+					continue
+				}
+				if ($This.PSObject.Properties[$Prop.Name] -eq $nulll) {
+				 	$This | Add-Member -MemberType $Prop.MemberType -Name $Prop.Name -Value $Prop.Value
+				} 
+			}			 
+		}
+		
+	}.GetNewClosure()
+	
+	$Item | Add-Member -MemberType ScriptMethod -Name $Operation -Value $ScriptBlock
+	$Item
+}
 
 Set-StrictMode -Version Latest
 #Export-ModuleMember ("Invoke-XmlApiRequest", "New-ListItem")
