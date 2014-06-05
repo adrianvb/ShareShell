@@ -217,7 +217,6 @@ Function New-ListItem {
 	$Fields | Where-Object { 
 		$_.TypeAsString -ne "Calculated" -and $_.TypeAsString -ne "Computed" 
 	} | ForEach-Object {
-		Write-Host ($_ | fl | Out-String)
 		$Properties[$_.InternalName] = $null		
 	}
 	
@@ -290,7 +289,6 @@ Function Add-ApiMethod {
 				-ErrorAction Inquire					
 			
 		} Catch {
-			Write-Host ($_ | Fl | Out-String)
 			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
 		}
 
