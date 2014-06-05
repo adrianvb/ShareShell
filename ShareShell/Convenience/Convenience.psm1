@@ -1,4 +1,4 @@
-﻿Function Get-Web {
+﻿Function Get-ShareWeb {
 	Param(
 		[Parameter(Mandatory=$true)] [String] $Uri
 	)
