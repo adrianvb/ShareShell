@@ -38,8 +38,17 @@ $List.__ApiMethods
 
 Right now you can use full CRUD on list and library items
 
+Dependencies
+------------
+- tests are based on Pester (https://github.com/pester/Pester)
+
 Links
 -----
 https://www.simple-talk.com/dotnet/.net-tools/further-down-the-rabbit-hole-powershell-modules-and-encapsulation/ 
 
+REST API reference and samples 
+	http://msdn.microsoft.com/en-us/library/office/jj860569(v=office.15).aspx
+	http://msdn.microsoft.com/en-us/magazine/dn198245.aspx
 
+Files and Folders
+   http://msdn.microsoft.com/en-us/library/office/dn450841(v=office.15).aspx
