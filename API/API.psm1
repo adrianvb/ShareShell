@@ -79,9 +79,6 @@ This function handles parsing the XML nodes returned by the api
 	# this block parses the content part of the xml response
 	#
 
-
-	
-
 	# 70x faster than Select-Xml
 	if ($Node.content.properties.ChildNodes.Count -gt 0) {
 		$Node.content.properties.ChildNodes | ForEach-Object {	
@@ -208,14 +205,14 @@ This function handles parsing the XML nodes returned by the api
 			$ParentList = $Item.ParentList()
 			Add-CachedItem -Key $ParentListUri -Value $ParentList
 		}
-		$Item = Add-ApiMethod -Item $Item -List $ParentList -Operation "Update"
-		$Item = Add-ApiMethod -Item $Item -List $ParentList -Operation "Delete"
+		$Item = Add-CrudMethod -Item $Item -List $ParentList -Operation "Update"
+		$Item = Add-CrudMethod -Item $Item -List $ParentList -Operation "Delete"
 	}
 	
 	$Item 
 }	
 
-Function Add-ApiMethod {
+Function Add-CrudMethod {
 	Param(
 		[Parameter(Mandatory=$true)] [ValidateSet("Create","Update","Delete")] [String] $Operation,
 		[Parameter(Mandatory=$true)] [Object] $List,
@@ -333,9 +330,9 @@ Function New-ListItem {
 	}
 	
 	$Item = New-Object -TypeName PSObject -Property $Properties	
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Create"	
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Update"
-	$Item = Add-ApiMethod -Item $Item -List $List -Operation "Delete"
+	$Item = Add-CrudMethod -Item $Item -List $List -Operation "Create"	
+	$Item = Add-CrudMethod -Item $Item -List $List -Operation "Update"
+	$Item = Add-CrudMethod -Item $Item -List $List -Operation "Delete"
 	
 	$Item
 }
