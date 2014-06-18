@@ -49,8 +49,28 @@ Function Add-CachedItem {
 	$Global:ShareShellCache[$Key] = $Value
 }
 
+Function Test-CachedItemExists {
+	Param(
+		$Key,
+		[Switch] $Verbose
+	)
+		
+	if ($Verbose) {
+		if($Global:ShareShellCache.Keys -contains $Key) { 
+			Write-Verbose "Test-CachedItemExists: hit '$key'"
+		} else { 
+			Write-Verbose "Test-CachedItemExists: miss '$key'" 
+		} 
+	}
+	
+	
+	$Global:ShareShellCache.Keys -contains $Key
+}
+
 Function Clear-Cache {
 	$Global:ShareShellCache = @{}
 }
 
-Clear-Cache
+if ($Global:ShareShellCache -eq $null) {
+	Clear-Cache
+}

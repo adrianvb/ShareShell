@@ -33,10 +33,10 @@ Function Invoke-XmlApiRequest {
 		Write-Debug ("Invoke-XmlApiRequest: Parsing as feed")
 		if ($Xml.feed.PSObject.Properties["entry"] -ne $null) {
 			$Counter = 0
-			$Total = $Xml.feed.entry.Count
+			#$Total = $Xml.feed.entry.Count
 			$Xml.feed.entry | ForEach-Object  {
 				$Counter += 1
-				Write-Progress -Activity "Fetching items" -PercentComplete (($Counter/$Total)*100)
+				#Write-Progress -Activity "Fetching items" -PercentComplete (($Counter/$Total)*100)
 				ConvertFrom-ApiResponse -Node $_ -RequestUri $Uri -EnableCaching:$EnableCaching
 			}
 		} else {
@@ -151,16 +151,20 @@ This function handles parsing the XML nodes returned by the api
 																		
 				# if this property is not cached, we request it and add it as cached property
 				# removing the cached property would reset this propertys state
-				if ($This.__ApiCache[$PropertyName] -ne $null -and $EnableCaching) {
-					$Response = $This.__ApiCache[$PropertyName]
-				} else {
-					$Parameters = @('$top=1000')
 				
-					$RequestUri = $EntryUri + "?" + [String]::Join("&", $Parameters)			
+				# build the request uri
+				# we use the request uri as key for the cache lookup
+				$Parameters = @('$top=1000')
+				$RequestUri = $EntryUri + "?" + [String]::Join("&", $Parameters)
+				
+				if ((Test-CachedItemExists -Key $RequestUri) -and $EnableCaching) {
+					$Response = Get-CachedItem -Key $RequestUri
+				} else {
+					
 					$Response = Invoke-XmlApiRequest -Uri $RequestUri
 					
 					if ($EnableCaching) {					
-						$This.__ApiCache[$PropertyName] = $Response
+						Add-CachedItem -Key $RequestUri -Value $Response
 					} 
 				}			
 				
