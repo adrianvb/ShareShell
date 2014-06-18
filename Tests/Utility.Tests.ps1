@@ -11,7 +11,7 @@ Describe "Utility Functions" {
 		
 		It "returns token" {
 			{ Get-FormDigest -BaseUri $ApiUri } | Should Not BeNullOrEmpty
-		}				
+		}		
 	}
 
 }
