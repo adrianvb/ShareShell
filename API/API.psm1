@@ -117,82 +117,25 @@ This function handles parsing the XML nodes returned by the api
 	
 	$BaseUri = ($RequestUri -replace '/_api/.*', '') + '/_api'
 
-	$MethodProperties = @()
+	$ApiMethods = @()
 	
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
 	
-		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {
+		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {			
+			$ApiMethods += $_.Title
 			
-			# property name: Items, Lists, SiteUsers, ...
-			$PropertyName = $_.Title
-						
-			$MethodProperties += $PropertyName
-	
 			# uris in the api are inconsisten: sometimes absolute, sometimes relative
 			# proper uri handling would be nice, system.uri makes me cry
-			if ($_.href -like "http*") {
-				$EntryUri = $_.href
-			} else {
-				$EntryUri = "{0}/{1}" -f $BaseUri, $_.href
+			$Uri = $_.href
+			if ($_.href -notlike "http*") {
+				$Uri = "{0}/{1}" -f $BaseUri, $_.href
 			}
 			
-			# this is where the magic happens
-			
-			# the "$limit=" option above does NOT work. however, the $top= does. 
-			# (https://sharepoint.stackexchange.com/questions/74777/list-api-get-all-items-limited-to-100-rows)	
-
-			# https://mjolinor.wordpress.com/2011/02/13/getnewclosure-vs-scriptblockcreate/
-			$ScriptClosure = { 
-				Param(
-					$Filter = $null,
-					[Switch] $EnableCaching = $false
-				);					
-				Write-Debug "Invoke-XmlApiRequest: Property $PropertyName"																				
-				
-				# we cache every response using another property
-																		
-				# if this property is not cached, we request it and add it as cached property
-				# removing the cached property would reset this propertys state
-				
-				# build the request uri
-				# we use the request uri as key for the cache lookup
-				$Parameters = @('$top=1000')
-				$RequestUri = $EntryUri + "?" + [String]::Join("&", $Parameters)
-				
-				if ((Test-CachedItemExists -Key $RequestUri) -and $EnableCaching) {
-					$Response = Get-CachedItem -Key $RequestUri
-				} else {
-					
-					$Response = Invoke-XmlApiRequest -Uri $RequestUri
-					
-					if ($EnableCaching) {					
-						Add-CachedItem -Key $RequestUri -Value $Response
-					} 
-				}			
-				
-				# filter is nifty
-				if ($Filter -ne $null) {				
-					if ($Filter -is [String]) {
-						$Filter = { 
-							$_.Title -like $Filter `
-							-or $_.Name -like $Filter `
-							-or $_.GUID -like $Filter `
-							-or $_.Id -like $Filter
-						}.GetNewClosure()
-					}
-					$Response = $Response | Where-Object $Filter					
-				}
-				$Response
-
-			}.GetNewClosure()
-										
-			$Item | Add-Member -MemberType ScriptMethod -Name $PropertyName -Value $ScriptClosure -Force
-						
-			
+			$Item = Add-ApiMethod  -Item $Item -Name $_.Title -Uri $Uri
 		}
 	}
 	
-	$Item | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $MethodProperties -Force
+	$Item | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $ApiMethods -Force
 	
 	#
 	# Add CRUD if entry has a content type 
@@ -211,6 +154,71 @@ This function handles parsing the XML nodes returned by the api
 	
 	$Item 
 }	
+
+Function Add-ApiMethod {
+	Param(
+		[Parameter(Mandatory=$true)]
+		[PSObject] $Item,
+		
+		[Parameter(Mandatory=$true)]
+		[String] $Name,
+				
+		[Parameter(Mandatory=$true)]
+		[String] $Uri	
+	)
+
+	# the "$limit=" option above does NOT work. however, the $top= does. 
+	# (https://sharepoint.stackexchange.com/questions/74777/list-api-get-all-items-limited-to-100-rows)	
+
+	# https://mjolinor.wordpress.com/2011/02/13/getnewclosure-vs-scriptblockcreate/
+	$ScriptClosure = { 
+		Param(
+			$Filter = $null,
+			[Switch] $EnableCaching = $false
+		);					
+		Write-Debug "Invoke-XmlApiRequest: Property $Name"																				
+		
+		# we cache every response using another property
+																
+		# if this property is not cached, we request it and add it as cached property
+		# removing the cached property would reset this propertys state
+		
+		# build the request uri
+		# we use the request uri as key for the cache lookup
+		$Parameters = @('$top=1000')
+		$RequestUri = $Uri + "?" + [String]::Join("&", $Parameters)
+		
+		if ((Test-CachedItemExists -Key $RequestUri) -and $EnableCaching) {
+			$Response = Get-CachedItem -Key $RequestUri
+		} else {
+			
+			$Response = Invoke-XmlApiRequest -Uri $RequestUri
+			
+			if ($EnableCaching) {					
+				Add-CachedItem -Key $RequestUri -Value $Response
+			} 
+		}			
+		
+		# filter is nifty
+		if ($Filter -ne $null) {				
+			if ($Filter -is [String]) {
+				$Filter = { 
+					$_.Title -like $Filter `
+					-or $_.Name -like $Filter `
+					-or $_.GUID -like $Filter `
+					-or $_.Id -like $Filter
+				}.GetNewClosure()
+			}
+			$Response = $Response | Where-Object $Filter					
+		}
+		$Response
+
+	}.GetNewClosure()
+								
+	$Item | Add-Member -MemberType ScriptMethod -Name $Name -Value $ScriptClosure -Force
+	$Item
+}
+
 
 Function Add-CrudMethod {
 	Param(
