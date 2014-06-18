@@ -1,10 +1,11 @@
 ﻿
 Function Get-FormDigest {
 	Param (
-		[String] $BaseUri
+		[String] $BaseUri,
+		[Switch] $DisableCaching
 	)
 	
-	$Uri =  "$BaseUri/_api/contextinfo"
+	$Uri =  "$BaseUri/asdadsd/_api/contextinfo"
 
 	# fetch cached xml
 	$Token = Get-CachedItem -Key $Uri
@@ -16,8 +17,12 @@ Function Get-FormDigest {
 		$Reload = $Token["Timeout"] -lt (Get-Date)
 	}
 	
-	if ($Reload) {
-		$Response = Invoke-WebRequest -Method  Post -Uri $Uri -UseDefaultCredentials
+	if ($Reload -or $DisableCaching) {
+		$Response = Invoke-WebRequest -Method  Post -Uri $Uri -UseDefaultCredentials		
+		if ($Response -eq $null) {
+			Throw "Get-FormDigest: Empty response"
+		}
+		
 		[Xml] $Data = $Response.Content
 		
 		$Token = @{

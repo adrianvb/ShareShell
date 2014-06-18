@@ -78,7 +78,10 @@ This function handles parsing the XML nodes returned by the api
 	# PROPERTIES
 	# this block parses the content part of the xml response
 	#
-		
+
+
+	
+
 	# 70x faster than Select-Xml
 	if ($Node.content.properties.ChildNodes.Count -gt 0) {
 		$Node.content.properties.ChildNodes | ForEach-Object {	
@@ -101,7 +104,10 @@ This function handles parsing the XML nodes returned by the api
 			
 			$Properties[$Name] = $Value
 		}					
-	}	
+	}		
+	
+	#<category term="SP.Folder", <category term="SP.Site", <category term="SP.List", <category term="SP.Data.Api_x0020_TestListItem"
+	$Properties["__Category"] = $Node.category.term 
 	
 	$Item = New-Object -TypeName PsObject -Property $Properties
 	
