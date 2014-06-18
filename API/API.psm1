@@ -114,9 +114,7 @@ This function handles parsing the XML nodes returned by the api
 	# this block parses the link part of the xml response
 	# each link will be represented as a function of this objects
 	#
-	
 	$BaseUri = ($RequestUri -replace '/_api/.*', '') + '/_api'
-
 	$ApiMethods = @()
 	
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
@@ -134,7 +132,6 @@ This function handles parsing the XML nodes returned by the api
 			$Item = Add-ApiMethod  -Item $Item -Name $_.Title -Uri $Uri
 		}
 	}
-	
 	$Item | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $ApiMethods -Force
 	
 	#
