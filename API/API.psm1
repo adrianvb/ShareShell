@@ -71,8 +71,7 @@ This function handles parsing the XML nodes returned by the api
 		d="http://schemas.microsoft.com/ado/2007/08/dataservices"
 	}
 	
-	$Properties = @{
-		"__ApiCache" = @{}
+	$Properties = @{		
 	}
 	
 	#
@@ -252,7 +251,6 @@ Function Add-ApiMethod {
 	
 		# Remove api properies
 		$TempItem.PSObject.Properties.Remove('__ApiMethods')
-		$TempItem.PSObject.Properties.Remove('__ApiCache')
 				
 		# let's do it
 		$Method = "POST"
