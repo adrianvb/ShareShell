@@ -259,6 +259,7 @@ Function Add-CrudMethod {
 	
 		# Remove api properies
 		$TempItem.PSObject.Properties.Remove('__ApiMethods')
+		$TempItem.PSObject.Properties.Remove('__Category')
 				
 		# let's do it
 		$Method = "POST"
