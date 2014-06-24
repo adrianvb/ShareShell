@@ -106,9 +106,9 @@ This function handles parsing the XML nodes returned by the api
 	}		
 	
 	#<category term="SP.Folder", <category term="SP.Site", <category term="SP.List", <category term="SP.Data.Api_x0020_TestListItem"
-	$Properties["__Category"] = $Node.category.term 
+	$Properties["__Category"] = $Node.category.term
 	$Properties["__Uri"] = "$BaseUri/$($Node.id)"
-	
+		
 	$Item = New-Object -TypeName PsObject -Property $Properties
 	
 	#
@@ -220,6 +220,10 @@ Function Add-ApiMethod {
 
 
 Function Add-CrudMethod {
+	<#
+	.SYNOPSIS
+	appends create(), update() and delete() to an object. Should be called Add-CudMethod ;-)
+	#>
 	Param(
 		[Parameter(Mandatory=$true)] [ValidateSet("Create","Update","Delete")] [String] $Operation,
 		[Parameter(Mandatory=$true)] [Object] $List,
@@ -280,27 +284,28 @@ Function Add-CrudMethod {
 				-Headers $Headers `
 				-ErrorAction Inquire					
 			
-		} Catch {
+		} Catch { 
 			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
 		}
 
-
-		if ($Operation -eq "Create") {
-			$Node = [Xml] $Response.Content
-			$ResponseItem = ConvertFrom-ApiResponse -Node $Node.entry -BaseUri $ParentWebUrl
+		if ($Operation -eq "Create") {	
+		
+			$Node = [Xml] $Response.Content						
+			$ResponseItem = ConvertFrom-ApiResponse -Node $Node.entry -RequestUri $Uri
 			
 			$ResponseItem.PsObject.Properties | ForEach {
 				$Prop = $_
 				
 				# i don't know why
-				if ($Prop -eq $nul) {
+				if ($Prop -eq $null -or $Prop -like '__metadata') {
 					continue
-				}
-				if ($This.PSObject.Properties[$Prop.Name] -eq $nulll) {
+				} elseif ($This.PSObject.Properties[$Prop.Name] -eq $null) {
 				 	$This | Add-Member -MemberType $Prop.MemberType -Name $Prop.Name -Value $Prop.Value
 				} 
 			}
 		}
+		
+		$This
 		
 	}.GetNewClosure()
 	

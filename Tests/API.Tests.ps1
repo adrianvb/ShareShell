@@ -3,6 +3,10 @@
 $InvalidApiUrl = "https://sharepoint.uni-hamburg.de/"
 $ValidApiUrl = "https://sharepoint.uni-hamburg.de/_api/web"
 
+$List = Invoke-XmlApiRequest "https://sharepoint.uni-hamburg.de/sites/api-test/_api/web/Lists/GetByTitle('New-ListItem')"
+
+$ItemTitle = (Get-Date)
+
 Describe "API Functions" { 
     Context "Invoke-XmlApiRequest" {
        
@@ -19,8 +23,29 @@ Describe "API Functions" {
 		}
 
 	}
-	
+	 
 	Context "New-ListItem" {
+		
+		It "returns a list item" {
+			New-ListItem -List $List | Should Not BeNullOrEmpty
+		}
+		
+		it "has a title field" {
+			{ (New-ListItem -List $List).title } | Should Not Throw
+		}
+		
+		it "item can be created" {
+			 
+			#	$Item = New-ListItem -List $List
+			#	$Item.Title = $ItemTitle
+			#	$Item.Create() 
+			
+		}
+		
+		it "can be deleted" {
+			$Items = $List.Items($ItemTitle) 
+			#{ $Items | ForEach-Object { $_.Delete() } } | Should Not Throw
+		} 
 		
 	}
 }
