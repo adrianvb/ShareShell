@@ -35,6 +35,15 @@ Describe "/_api/web" {
 			$Web.__Category | Should Be "SP.Web"
 		}
 		
+		It "has a '__Uri' property" {
+			$Web = Invoke-XmlApiRequest -Uri $TestWebApiUrl 
+			$Web.__Uri | Should Not BeNullOrEmpty
+		}
+		
+		It "'__Uri' is '$TestWebApiUrl'" {
+			$Web = Invoke-XmlApiRequest -Uri $TestWebApiUrl 
+			$Web.__Uri | Should Be $TestWebApiUrl
+		}
 
 
 	}

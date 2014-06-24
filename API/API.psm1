@@ -71,6 +71,8 @@ This function handles parsing the XML nodes returned by the api
 		d="http://schemas.microsoft.com/ado/2007/08/dataservices"
 	}
 	
+	$BaseUri = ($RequestUri -replace '/_api/.*', '') + '/_api'
+	
 	$Properties = @{		
 	}
 	
@@ -105,6 +107,7 @@ This function handles parsing the XML nodes returned by the api
 	
 	#<category term="SP.Folder", <category term="SP.Site", <category term="SP.List", <category term="SP.Data.Api_x0020_TestListItem"
 	$Properties["__Category"] = $Node.category.term 
+	$Properties["__Uri"] = "$BaseUri/$($Node.id)"
 	
 	$Item = New-Object -TypeName PsObject -Property $Properties
 	
@@ -114,7 +117,6 @@ This function handles parsing the XML nodes returned by the api
 	# this block parses the link part of the xml response
 	# each link will be represented as a function of this objects
 	#
-	$BaseUri = ($RequestUri -replace '/_api/.*', '') + '/_api'
 	$ApiMethods = @()
 	
 	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
@@ -228,7 +230,7 @@ Function Add-CrudMethod {
 	
 	$ScriptBlock = {
 
-		$TempItem = $Item
+		$TempItem = $Item 
 		
 		# Request digest for authtentication
 		$RequestDigest = Get-FormDigest -BaseUri $ParentWebUrl
@@ -260,6 +262,7 @@ Function Add-CrudMethod {
 		# Remove api properies
 		$TempItem.PSObject.Properties.Remove('__ApiMethods')
 		$TempItem.PSObject.Properties.Remove('__Category')
+		$TempItem.PSObject.Properties.Remove('__Uri')
 				
 		# let's do it
 		$Method = "POST"
@@ -296,7 +299,7 @@ Function Add-CrudMethod {
 				if ($This.PSObject.Properties[$Prop.Name] -eq $nulll) {
 				 	$This | Add-Member -MemberType $Prop.MemberType -Name $Prop.Name -Value $Prop.Value
 				} 
-			}			 
+			}
 		}
 		
 	}.GetNewClosure()
