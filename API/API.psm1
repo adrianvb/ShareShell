@@ -208,7 +208,10 @@ Function Add-ApiMethod {
 					-or $_.Id -like $Filter
 				}.GetNewClosure()
 			}
-			$Response = $Response | Where-Object $Filter					
+			$Response = $Response | Where-Object $Filter
+			if ($Response -eq $null) {
+				Write-Error ($Name + ": empty result set after filter")
+			}
 		}
 		$Response
 
