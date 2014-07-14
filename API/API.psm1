@@ -237,6 +237,10 @@ Function Add-CrudMethod {
 	
 	$ScriptBlock = {
 
+		if ($Operation -eq "Update" -and $Item.Id -eq $null) {
+			Write-Error "Update(): Empty id, use Create()!"
+		}
+
 		$TempItem = $Item 
 		
 		# Request digest for authtentication
@@ -257,14 +261,13 @@ Function Add-CrudMethod {
 		if ($Operation -eq "Delete") {
 			$Uri = "{0}/_api/Lists(guid'{1}')/Items({2})" -f $ParentWebUrl, $List.Id, $This.Id
 			$Headers["X-HTTP-Method"] = "DELETE"
-		}
-		
+		}		
 		
 		if ($TempItem.PsObject.Properties["__metadata"] -eq $null) {
 			$TempItem | Add-Member -MemberType NoteProperty -Name "__metadata" -Value @{ 
 				'type' = $List.ListItemEntityTypeFullName
 			}
-		}
+		}						
 	
 		# Remove api properies
 		$TempItem.PSObject.Properties.Remove('__ApiMethods')
@@ -335,14 +338,24 @@ Function New-ListItem {
 	
 	# fetch fields if not passed as parameter
 	if ($Fields -eq $null) {
-		$ContentType = $List.ContentTypes({$_.Name -like $ElementTypeName}) | Select-Object -First 1
+		$ContentType = $List.ContentTypes({$_.Name -like $ElementTypeName}, $true) | Select-Object -First 1
 		$Fields = $ContentType.Fields()
 	}
 	
+	
+	$Fields = $Fields | ForEach-Object {
+		if ($_.TypeAsString -eq "Lookup") {
+			if ($_.IsRelationship -eq "True") {
+				$_.InternalName = ($_.InternalName + "Id")
+				$_
+			}
+		} elseif ($_.TypeAsString -ne "Calculated" -and $_.TypeAsString -ne "Computed") {
+			$_
+		}
+	}
+		
 	$Properties = @{}
-	$Fields | Where-Object { 
-		$_.TypeAsString -ne "Calculated" -and $_.TypeAsString -ne "Computed" 
-	} | ForEach-Object {
+	$Fields | ForEach-Object {
 		$Properties[$_.InternalName] = $null		
 	}
 	
