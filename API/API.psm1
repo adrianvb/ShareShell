@@ -99,6 +99,13 @@ This function handles parsing the XML nodes returned by the api
 					'Edm.DateTime' { [DateTime] $Value }
 					default { [String] $Value }
 				}
+                
+                if ($_.Type -like "Collection*") {
+                    $Value = @()
+                    ForEach ($Reference in $_.ChildNodes) {
+                        $Value += $Reference."#text"
+                    }
+                }
 			}
 			
 			$Properties[$Name] = $Value
