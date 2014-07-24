@@ -73,36 +73,49 @@ This function handles parsing the XML nodes returned by the api
 	
 	$BaseUri = ($RequestUri -replace '/_api/.*', '') + '/_api'
 	
-	$Properties = @{		
-	}
-	
 	#
-	# PROPERTIES
+	# PROPERTIES 
 	# this block parses the content part of the xml response
 	#
-
+    $Properties = @{}
+    
 	# 70x faster than Select-Xml
 	if ($Node.content.properties.ChildNodes.Count -gt 0) {
-		$Node.content.properties.ChildNodes | ForEach-Object {	
-			$Name = $_.ToString()
+		ForEach ($Property in $Node.content.properties.ChildNodes) {	
 			
-			$Value = $null
-			if ($_.PSObject.Properties["#text"] -ne $null) {
-				$Value = $_."#text"	
-			} 
+            # der Name des Tags ist der Name der Eigenschaft
+            $Name = $Property.ToString()
+            
+            # das Tag muss nicht zwingend einen Inhalt haben
+            $Value = $null
+            if ($Property.PSObject.Properties["#text"] -ne $null) {
+                $Value = [String] $Property."#text"
+            }             
+            
+            # der Typ ist leider auch nicht für alle Eigenschaften verfügbar
+            $Type = $null
+            if ($Property.PSObject.Properties["type"] -ne $null) {
+                $Type = $Property.Type
+            } 
+                        
 			
-			if ($_.PSObject.Properties["type"] -ne $null) {			
-				$Value = Switch($_.Type) {
-					'Edm.Boolean' { if ($Value -eq "true") { $true} else { $false } }
-					'Edm.Int16' { [Decimal] $Value }
-					'Edm.Int32' { [Decimal] $Value }
-					'Edm.DateTime' { [DateTime] $Value }
-					default { [String] $Value }
+			if ($Type -ne $null) {			
+				Switch($Type) {
+					'Edm.Boolean' { 
+                        if ($Value -eq "true") { 
+                            $Value = $true
+                        } else { 
+                            $Value = $false 
+                        }                            
+                    }
+					'Edm.DateTime' { 
+                        $Value = [DateTime] $Value 
+                    }
 				}
                 
-                if ($_.Type -like "Collection*") {
+                if ($Type -like "Collection*") {
                     $Value = @()
-                    ForEach ($Reference in $_.ChildNodes) {
+                    ForEach ($Reference in $Property.ChildNodes) {
                         $Value += $Reference."#text"
                     }
                 }
@@ -111,6 +124,7 @@ This function handles parsing the XML nodes returned by the api
 			$Properties[$Name] = $Value
 		}					
 	}		
+    
 	
 	#<category term="SP.Folder", <category term="SP.Site", <category term="SP.List", <category term="SP.Data.Api_x0020_TestListItem"
 	$Properties["__Category"] = $Node.category.term
