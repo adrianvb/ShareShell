@@ -3,7 +3,8 @@
 $InvalidApiUrl = "https://sharepoint.uni-hamburg.de/"
 $ValidApiUrl = "https://sharepoint.uni-hamburg.de/_api/web"
 
-$List = Invoke-XmlApiRequest "https://sharepoint.uni-hamburg.de/sites/api-test/_api/web/Lists/GetByTitle('New-ListItem')"
+$SharePointList = Invoke-XmlApiRequest "https://sharepoint.uni-hamburg.de/sites/api-test/_api/web/Lists/GetByTitle('New-ListItem')"
+$NorthwindList = Invoke-XmlApiRequest "http://services.odata.org/V3/Northwind/Northwind.svc/Orders/"
 
 $ItemTitle = (Get-Date)
 
@@ -21,17 +22,16 @@ Describe "API Functions" {
 		It "throws error on bogus host" {
 			{ Invoke-XmlApiRequest -Uri "http://bogus.test" } | Should Throw
 		}
-
 	}
 	 
 	Context "New-ListItem" {
 		
 		It "returns a list item" {
-			New-ListItem -List $List | Should Not BeNullOrEmpty
+			New-ListItem -List $SharePointList | Should Not BeNullOrEmpty
 		}
 		
 		it "has a title field" {
-			{ (New-ListItem -List $List).title } | Should Not Throw
+			{ (New-ListItem -List $SharePointList).title } | Should Not Throw
 		}
 		
 		it "item can be created" {
@@ -43,7 +43,7 @@ Describe "API Functions" {
 		}
 		
 		it "can be deleted" {
-			$Items = $List.Items($ItemTitle) 
+			$Items = $SharePointList.Items($ItemTitle) 
 			#{ $Items | ForEach-Object { $_.Delete() } } | Should Not Throw
 		} 
 		
