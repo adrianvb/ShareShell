@@ -20,10 +20,14 @@ Function Invoke-XmlApiRequest {
 		-UseDefaultCredentials `
 		-Method $Method
 		
-	if ($Uri -notmatch "(.*/_api)") {
-		Write-Error "Invoke-XmlApiRequest: /api missing in uri: '$Uri'"
-	}
-	$BaseUri = $Matches[1]
+    if ($Uri -match "(.*/_api)") {
+        $BaseUri = $Matches[1]
+    } else {
+        Write-Verbose "Invoke-XmlApiRequest: /api missing in uri: '$Uri'"
+        $BaseUri = $Uri
+		
+	}    
+	
 		
 	[Xml] $Xml = $Result.Content -replace 'xmlns="http://www.w3.org/2005/Atom"'	
 	
@@ -89,28 +93,32 @@ This function handles parsing the XML nodes returned by the api
             # das Tag muss nicht zwingend einen Inhalt haben
             $Value = $null
             if ($Property.PSObject.Properties["#text"] -ne $null) {
-                $Value = [String] $Property."#text"
+                $Value = $Property."#text"
             }             
             
             # der Typ ist leider auch nicht für alle Eigenschaften verfügbar
-            $Type = $null
             if ($Property.PSObject.Properties["type"] -ne $null) {
                 $Type = $Property.Type
-            } 
-                        
-			
-			if ($Type -ne $null) {			
-				Switch($Type) {
+            
+                Switch($Type) {
 					'Edm.Boolean' { 
                         if ($Value -eq "true") { 
                             $Value = $true
                         } else { 
                             $Value = $false 
-                        }                            
+                        }
                     }
-					'Edm.DateTime' { 
-                        $Value = [DateTime] $Value 
+                    'Edm.Int32' {
+                        $Value = [Int32] $Value
                     }
+                    'Edm.Decimal' {
+                        $Value = [Double] $Value
+                    }
+					'Edm.DateTime' {
+                        $Value = [DateTime] $Value
+                    }
+                    # 'Edm.Binary' {}
+                    
 				}
                 
                 if ($Type -like "Collection*") {
@@ -125,11 +133,18 @@ This function handles parsing the XML nodes returned by the api
 		}					
 	}		
     
-	
-	#<category term="SP.Folder", <category term="SP.Site", <category term="SP.List", <category term="SP.Data.Api_x0020_TestListItem"
 	$Properties["__Category"] = $Node.category.term
-	$Properties["__Uri"] = "$BaseUri/$($Node.id)"
-		
+
+    # Uri des Objekts
+    $EditUri = $Node.link | Where-Object { $_.rel -eq "edit" } | Select-Object -First 1 -ExpandProperty href
+    if ($EditUri[0]  -notmatch "http.*") {
+        $ItemUri = "$BaseUri/$EditUri"
+    }
+	$Properties["__Uri"] = $ItemUri
+	
+    #
+    # und hier unser neues Objekt
+    #        
 	$Item = New-Object -TypeName PsObject -Property $Properties
 	
 	#
@@ -140,19 +155,20 @@ This function handles parsing the XML nodes returned by the api
 	#
 	$ApiMethods = @()
 	
-	$Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null } | ForEach-Object {
-	
-		if ($_.Type -like "*type=entry*" -or $_.Type -like "*type=feed*") {			
-			$ApiMethods += $_.Title
+	$NavigationLinks = $Node.link | Where-Object { $_.PSObject.Properties["Title"] -ne $null -and $_.PSObject.Properties["Type"] -ne $null } 
+    ForEach ($Link in $NavigationLinks) { 
+	            
+		if ($Link.Type -like "*type=entry*" -or $Link.Type -like "*type=feed*") {			
+			$ApiMethods += $Link.Title
 			
 			# uris in the api are inconsisten: sometimes absolute, sometimes relative
 			# proper uri handling would be nice, system.uri makes me cry
-			$Uri = $_.href
-			if ($_.href -notlike "http*") {
-				$Uri = "{0}/{1}" -f $BaseUri, $_.href
+			$Uri = $Link.href
+			if ($Link.href -notlike "http*") {
+				$Uri = "{0}/{1}" -f $BaseUri, $Link.href
 			}
 			
-			$Item = Add-ApiMethod  -Item $Item -Name $_.Title -Uri $Uri
+			$Item = Add-ApiMethod  -Item $Item -Name $Link.Title -Uri $Uri            
 		}
 	}
 	$Item | Add-Member -MemberType NoteProperty -Name "__ApiMethods" -Value $ApiMethods -Force
