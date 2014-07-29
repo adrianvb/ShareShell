@@ -273,18 +273,17 @@ Function Add-CrudMethod {
 	)
 	
 	$ScriptBlock = {
-
-		if ($Operation -eq "Update" -and $Item.Id -eq $null) {
-			Write-Error "Update(): Empty id, use Create()!"
-		}
-
+	
+		if ($Operation -eq "Update" -and $This.Id -eq $null) {
+			Write-Warning "Update(): Empty id, use Create()!"
+		}		
 		$TempItem = $Item 
 		
 		# Request digest for authtentication
 		$RequestDigest = Get-FormDigest -BaseUri $ParentWebUrl
 		
 		$Headers =  @{
-			"Accept" = "application/xml; odata=verbose" 
+			#"Accept" = "application/xml; odata=verbose" 
 			"X-RequestDigest" = $RequestDigest			
 			"If-Match" = "*"
 		}				
@@ -328,7 +327,7 @@ Function Add-CrudMethod {
 				-ErrorAction Inquire					
 			
 		} Catch { 
-			Write-Error ($_.Exception.Response | Format-List -Force | Out-String)
+			Write-Host ($_.Exception | Format-List -Force | Out-String)
 		}
 
 		if ($Operation -eq "Create") {	
@@ -352,7 +351,8 @@ Function Add-CrudMethod {
 		
 	}.GetNewClosure()
 	
-	$Item | Add-Member -MemberType ScriptMethod -Name $Operation -Value $ScriptBlock
+	
+	$Item | Add-Member -MemberType ScriptMethod -Name $Operation -Value $ScriptBlock	
 	$Item
 }
 
