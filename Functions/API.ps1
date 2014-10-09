@@ -26,9 +26,7 @@ Function Invoke-XmlApiRequest {
         Write-Verbose "Invoke-XmlApiRequest: /api missing in uri: '$Uri'"
         $BaseUri = $Uri
 		
-	}    
-	
-		
+	}    			
 	[Xml] $Xml = $Result.Content -replace 'xmlns="http://www.w3.org/2005/Atom"'	
 	
 	# if there are no entries, $xml.feed.entry does not exist
@@ -44,7 +42,7 @@ Function Invoke-XmlApiRequest {
 				ConvertFrom-ApiResponse -Node $_ -RequestUri $Uri -EnableCaching:$EnableCaching
 			}
 		} else {
-			Write-Debug ("Invoke-XmlApiRequest: No entries for '{0}'" -f $Uri)
+			Write-Verbose ("Invoke-XmlApiRequest: No entries for '{0}'" -f $Uri)
 		}
 		
 	} elseif ($Xml.PSObject.Properties["entry"] -ne $null) {	

@@ -1,9 +1,9 @@
 ﻿Function Get-ShareWeb {
+    [CmdletBinding()]    
 	Param(
 		[Parameter(Mandatory=$true)] [String] $Uri
 	)
-	
-	
+		
 	
 	# https://sharepoint/sites/playground/_layouts/15/start.aspx#/Lists/Reboot/AllItems.aspx
 	if ($Uri -like "*/_layouts/15/start.aspx#*") {
@@ -18,7 +18,8 @@
 		$Uri = "$Uri/_api/web"
 	}	
 	
-	Invoke-XmlApiRequest -Uri $Uri	
+    Write-Debug "Get-ShareWeb: $Uri"
+    Invoke-XmlApiRequest -Uri $Uri -Debug:($PSCmdlet.MyInvocation.BoundParameters["Debug"].IsPresent) -Verbose:($PSCmdlet.MyInvocation.BoundParameters["Verbose"].IsPresent)
 }
 
 Function Get-ShareEffectivePermissionsForUser {
